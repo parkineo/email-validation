@@ -69,6 +69,23 @@ class TestEmailValidator:
         mock_mx = MagicMock()
         mock_mx.preference = 10
         mock_mx.exchange = "mail.example.com."
+        mock_resolve.return_value = [mock_mx]
+
+        result = self.validator.get_mx_record("example.com")
+        assert result == "mail.example.com"
+        mock_resolve.assert_called_once_with("example.com", 'MX')
+
+    @patch('dns.resolver.resolve')
+    def test_get_mx_record_multiple_records(self, mock_resolve):
+        """Test MX record lookup with multiple records."""
+        mock_mx1 = MagicMock()
+        mock_mx1.preference = 20
+        mock_mx1.exchange = "mail2.example.com."
+
+        mock_mx2 = MagicMock()
+        mock_mx2.preference = 10
+        mock_mx2.exchange = "mail1.example.com."
+
         mock_resolve.return_value = [mock_mx1, mock_mx2]
 
         result = self.validator.get_mx_record("example.com")
@@ -291,21 +308,4 @@ class TestEmailValidatorIntegration:
         assert result['format_valid'] is True
         assert result['domain_exists'] is False
         assert result['smtp_valid'] is False
-        assert result['valid'] is False_value = [mock_mx]
-
-        result = self.validator.get_mx_record("example.com")
-        assert result == "mail.example.com"
-        mock_resolve.assert_called_once_with("example.com", 'MX')
-
-    @patch('dns.resolver.resolve')
-    def test_get_mx_record_multiple_records(self, mock_resolve):
-        """Test MX record lookup with multiple records."""
-        mock_mx1 = MagicMock()
-        mock_mx1.preference = 20
-        mock_mx1.exchange = "mail2.example.com."
-
-        mock_mx2 = MagicMock()
-        mock_mx2.preference = 10
-        mock_mx2.exchange = "mail1.example.com."
-
-        mock_resolve.return
+        assert result['valid'] is False
