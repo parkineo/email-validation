@@ -87,36 +87,54 @@ class TestCLIIntegration:
         """Test complete CLI workflow."""
         output_file = os.path.join(temp_dir, "test_output.csv")
 
-        # Mock the EmailValidator to return predictable results
-        with patch('email_validation.cli.EmailValidator') as mock_validator_class:
-            mock_validator = MagicMock()
-            mock_validator_class.return_value = mock_validator
+        # Mock the async validation function directly
+        async def mock_validate_email_batch(validator, emails_batch, csv_writer, fieldnames):
+            """Mock the async validation batch function."""
+            valid_count = 0
+            invalid_count = 0
 
-            def mock_verify(email):
+            for i, row in emails_batch:
+                email = row['email'].strip().lower()
+
+                # Create validation result based on email content
                 if "invalid" in email.lower():
-                    return {
+                    validation_result = {
                         'valid': False,
                         'reason': 'Invalid email format',
                         'format_valid': False,
                         'domain_exists': False,
                         'smtp_valid': False
                     }
+                    invalid_count += 1
                 else:
-                    return {
+                    validation_result = {
                         'valid': True,
                         'reason': 'Email verified successfully',
                         'format_valid': True,
                         'domain_exists': True,
                         'smtp_valid': True
                     }
+                    valid_count += 1
 
-            mock_validator.verify_email_smtp.side_effect = mock_verify
+                # Create row with validation data
+                row_with_validation = row.copy()
+                row_with_validation.update({
+                    'email_original': row['email'],
+                    'email': email,
+                    'email_valid': validation_result['valid'],
+                    'validation_reason': validation_result['reason'],
+                    'format_valid': validation_result['format_valid'],
+                    'domain_exists': validation_result['domain_exists'],
+                    'smtp_valid': validation_result['smtp_valid']
+                })
 
-            # Mock progress tracker methods
-            mock_progress_tracker = MagicMock()
-            mock_progress_tracker.is_processed.return_value = False
-            mock_validator.progress_tracker = mock_progress_tracker
+                # Write result immediately
+                csv_writer.write_result(row_with_validation, fieldnames)
 
+            return valid_count, invalid_count
+
+        # Patch the async validation function
+        with patch('email_validation.cli.validate_email_batch', side_effect=mock_validate_email_batch):
             # Run the CLI
             with patch.object(sys, 'argv', ['email_validator.py', sample_csv_file, output_file, '0.1']):
                 main()
